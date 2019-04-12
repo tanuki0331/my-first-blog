@@ -1,0 +1,46 @@
+scriptencoding utf-8
+
+" 最大化状態で起動
+augroup myCmd
+   autocmd!
+   autocmd GUIEnter * simalt ~x
+augroup end
+
+" IME状態を記憶させない
+set iminsert=0
+set imsearch=0
+augroup imeCtrl
+    autocmd!
+    autocmd InsertLeave * set iminsert=0 imsearch=0
+augroup end
+
+set guioptions-=T                                   " メニューからアイコンを消す
+set guifont=MeiryoKe_Gothic:h10                     " フォント設定
+
+set guitablabel=%N:\ %{GuiTabLable()}               " タブのラベルをカスタマイズ
+function! GuiTabLable()
+    let l:result = ''
+
+    " タブに含まれるバッファ(ウィンドウ)についての情報をとっておきます。
+    let l:bufnrlist = tabpagebuflist(v:lnum)
+
+    " バッファの番号を追加
+    let l:result .= "[". bufnr("%") ."] "
+
+    " バッファ名を追加
+    let l:bufname = fnamemodify(bufname(l:bufnrlist[tabpagewinnr(v:lnum) - 1]), ':t')
+    let l:result .= l:bufname == '' ? 'No title' : l:bufname
+
+    " バッファに変更がある場合は'[+]'を追加
+    if getbufvar(l:bufnrlist[tabpagewinnr(v:lnum) - 1], "&mod")
+        let l:result .= ' [+]'
+    endif
+    return l:result
+endfunction
+
+" IME ON時のカーソルの色を設定(off:緑 on:紫)
+highlight Cursor guibg=Green guifg=NONE
+highlight CursorIM guibg=Red guifg=NONE
+
+" 半透明にする
+autocmd FocusGained * set transparency=220
