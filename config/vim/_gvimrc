@@ -1,10 +1,20 @@
 scriptencoding utf-8
 
 " 最大化状態で起動
-augroup myCmd
-   autocmd!
-   autocmd GUIEnter * simalt ~x
-augroup end
+" augroup myCmd
+"    autocmd!
+"    autocmd GUIEnter * simalt ~x
+" augroup end
+" ウインドウの幅
+set columns=170
+" ウインドウの高さ
+set lines=70
+
+"-------------------------------------------------------------------------------
+"vim-hybridの設定
+"-------------------------------------------------------------------------------
+set background=dark
+colorscheme hybrid
 
 " IME状態を記憶させない
 set iminsert=0

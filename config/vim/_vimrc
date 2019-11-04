@@ -43,6 +43,12 @@ set hidden                                          " 編集中でもバッフ�
 set backspace=indent,eol,start                      " バックスペースでインデントや改行を削除できるようにする
 set clipboard+=unnamed                              " ヤンクをクリップボードへ送り込む
 set expandtab                                       " タブをスペースに展開する
+" 改行時の自動コメントをオフ
+augroup auto_comment_off
+    autocmd!
+    autocmd BufEnter,FileType * setlocal formatoptions-=r
+    autocmd BufEnter,FileType * setlocal formatoptions-=o
+augroup END
 
 "-------------------------------------------------------------------------------
 " 検索に関する設定
@@ -62,7 +68,7 @@ set synmaxcol=300                                   " syntax highlightingを300�
 " 通常(NORMAL)モード時の設定 nmap
 "-------------------------------------------------------------------------------
 " 一部のキーを無効にする
-nnoremap <space> <Nop>                              " プラグインの起動トリガー
+nnoremap <space> <Nop>
 nnoremap b <Nop>
 nnoremap m <Nop>
 nnoremap s <Nop>
@@ -70,6 +76,7 @@ nnoremap S <Nop>
 nnoremap t <Nop>
 nnoremap Q <Nop>
 nnoremap Z <Nop>
+nnoremap , <Nop>
 
 " 検索ハイライトをクリア
 nnoremap <silent> <C-L> :<C-u>nohlsearch<CR>
@@ -146,7 +153,8 @@ endfunction
 nnoremap / :<c-u>set imsearch=0<CR>/
 
 " ファイルとバッファの内容でdiff
-command! DiffOrig vert new | set bt=nofile | r ++edit # | 0d_ | diffthis | wincmd p | diffthis
+set diffopt=filler,iwhite,internal
+command! DiffOrig tabnew % | vert new | set bt=nofile | r ++edit # | 0d_ | diffthis | wincmd p | diffthis
 nnoremap <silent> \dd :<C-u>DiffOrig<CR>
 
 " fold移動時にカーソルを中央に移動
@@ -185,29 +193,31 @@ xnoremap <silent> P :<C-u>call Put_text_without_override_register()<CR>
 
 function! Put_text_without_override_register()
 
-    " 選択範囲の末尾の位置を取得
-    let sel_start_line = line('''<')
-
-    " 選択範囲の末尾の位置を取得
-    let sel_col = col('''>')
+    " 選択範囲の終了位置を取得
     let sel_end_line = line('''>')
+    let sel_end_col = col('''>')
 
-    " 行末に移動した場合の位置を取得
-    execute "normal! $"
+    " 選択範囲の終了位置の行末位置を取得
+    execute 'normal! ''>$'
     let end_col = col('.')
+
+    " バッファ全行数を取得
+    let buf_end_line = line('$')
 
     " 選択範囲を削除(消去レジスタを使用)
     execute 'normal! gv"_x'
 
-    " 行末の場合
-    if sel_col == end_col && sel_start_line == sel_end_line
+    " 最終行でカーソル位置が末尾の場合
+    if sel_end_line == buf_end_line && end_col <= sel_end_col
+        execute 'normal! p'
+    " 空行でなくカーソル位置が末尾の場合
+    elseif col('$') > 1 && end_col <= sel_end_col
         execute 'normal! p'
     else
         execute 'normal! P'
     endif
-
 endfunction
-
+"
 " インデントを統一
 xnoremap = >gv<`j
 
@@ -261,13 +271,9 @@ Plug 'itchyny/lightline.vim'
 Plug 'tpope/vim-fugitive'
 Plug 'Shougo/neocomplete.vim'
 Plug 'mattn/emmet-vim'
+Plug 'junegunn/vim-easy-align'
+Plug 'ronakg/quickr-preview.vim'
 call plug#end()
-
-"-------------------------------------------------------------------------------
-"vim-hybridの設定
-"-------------------------------------------------------------------------------
-set background=dark
-colorscheme hybrid
 
 "-------------------------------------------------------------------------------
 "vim-asteriskの設定
@@ -292,7 +298,7 @@ noremap sF F
 "-------------------------------------------------------------------------------
 "vim-better-whitespaceの設定
 "-------------------------------------------------------------------------------
-highlight ExtraWhitespace guibg=darkcyan
+let g:better_whitespace_guicolor='darkcyan'
 
 "-------------------------------------------------------------------------------
 "tcomment_vimの設定
@@ -303,9 +309,6 @@ call tcomment#type#Define('crs', '/* %s */')
 "-------------------------------------------------------------------------------
 "vim-diffbufの設定
 "-------------------------------------------------------------------------------
-" 空白無視
-set diffopt=iwhite
-
 " mapping
 nnoremap <silent> \df :<C-u>DiffBuf<CR>
 
@@ -328,22 +331,50 @@ function! s:open_NERDTree()
     silent exe 'NERDTreeToggle'
 endfunction
 
+" nerdtree内のmapping
+augroup nerdtree
+  autocmd!
+  autocmd FileType nerdtree call s:nerdtree_my_settings()
+augroup END
+function! s:nerdtree_my_settings()
+    nnoremap <buffer> s <c-w>
+endfunction
+
 "-------------------------------------------------------------------------------
 "ctrlp.vimの設定
 "-------------------------------------------------------------------------------
 " オプション
 let g:ctrlp_extensions = ['line', 'mixed']
-let g:ctrlp_map = '<NOP>'
+let g:ctrlp_map = ''
 let g:ctrlp_match_window = 'bottom,order:ttb,min:20,max:20'
 let g:ctrlp_tabpage_position = 'a'
 let g:ctrlp_open_new_file = 't'
+let g:ctrlp_root_markers = ['.project']
+let g:ctrlp_key_loop = 1
+
+" prompt時のマッピングの変更
+let g:ctrlp_prompt_mappings = {
+        \ 'PrtBS()':              ['<bs>', '<c-h>'],
+        \ 'PrtDelete()':          ['<del>', '<c-d>'],
+        \ 'PrtSelectMove("j")':   ['<c-n>', '<down>'],
+        \ 'PrtSelectMove("k")':   ['<c-p>', '<up>'],
+        \ 'PrtInsert("c")':       ['<c-v>', '<MiddleMouse>', '<insert>'],
+        \ 'AcceptSelection("v")': ['<RightMouse>'],
+        \ 'PrtHistory(-1)':       [],
+        \ 'PrtHistory(1)':        [],
+        \ 'ToggleByFname()':      [],
+        \ 'ToggleType(1)':        ['<c-up>'],
+        \ 'ToggleType(-1)':       ['<c-down>'],
+        \ 'PrtCurLeft()':         ['<left>', '<c-b>'],
+        \ 'PrtCurRight()':        ['<right>', '<c-f>'],
+        \ }
 
 " マッピング
 nnoremap <silent> <space>b :<C-u>CtrlPBuffer<CR>
-nnoremap <silent> <space>f :<C-u>CtrlPCurFile<CR>
+nnoremap          <space>f :<C-u>CtrlP <C-R>=expand('%:p:h')<CR>
 nnoremap <silent> <space>m :<C-u>CtrlPMRU<CR>
 nnoremap <silent> <space>l :<C-u>CtrlPLine<CR>
-nnoremap <silent> <space>p :<C-u>CtrlPMixed<CR>
+nnoremap <silent> <space>p :<C-u>CtrlPRoot<CR>
 
 "-------------------------------------------------------------------------------
 "vim-singletonの設定
@@ -492,5 +523,15 @@ let g:user_emmet_settings = {
             \    },
             \}
 
+"-------------------------------------------------------------------------------
+"junegunn/vim-easy-alignの設定
+"-------------------------------------------------------------------------------
+vmap ga <Plug>(EasyAlign)
 
-
+"-------------------------------------------------------------------------------
+"ronakg/quickr-preview.vimの設定
+"-------------------------------------------------------------------------------
+let g:quickr_preview_keymaps = 0
+nnoremap ,w :<c-u>cwindow<CR>
+nmap ,p <plug>(quickr_preview)
+nmap <silent> ,q :<c-u>pclose<CR><plug>(quickr_preview_qf_close)
