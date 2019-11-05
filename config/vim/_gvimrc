@@ -1,20 +1,9 @@
 scriptencoding utf-8
 
-" 最大化状態で起動
-" augroup myCmd
-"    autocmd!
-"    autocmd GUIEnter * simalt ~x
-" augroup end
-" ウインドウの幅
-set columns=170
-" ウインドウの高さ
-set lines=70
-
-"-------------------------------------------------------------------------------
-"vim-hybridの設定
-"-------------------------------------------------------------------------------
-set background=dark
-colorscheme hybrid
+set columns=140             " 横幅
+set lines=50                " 高さ
+set guioptions-=T           " メニューからアイコンを消す
+set cursorline              " カーソルラインを表示
 
 " IME状態を記憶させない
 set iminsert=0
@@ -24,10 +13,15 @@ augroup imeCtrl
     autocmd InsertLeave * set iminsert=0 imsearch=0
 augroup end
 
-set guioptions-=T                                   " メニューからアイコンを消す
-set guifont=MeiryoKe_Gothic:h10                     " フォント設定
+" フォント設定
+if has('win32') || has ('win64')
+    set guifont=MeiryoKe_Gothic:h10
+else
+    set guifont=Cica\ 12
+endif
 
-set guitablabel=%N:\ %{GuiTabLable()}               " タブのラベルをカスタマイズ
+" タブラベル設定
+set guitablabel=%N:\ %{GuiTabLable()}
 function! GuiTabLable()
     let l:result = ''
 
@@ -48,9 +42,22 @@ function! GuiTabLable()
     return l:result
 endfunction
 
+" 半透明にする(KaoriYa版独自機能)
+if has('kaoriya')
+    autocmd FocusGained * set transparency=240
+endif
+
+"-------------------------------------------------------------------------------
+"vim-hybridの設定
+"-------------------------------------------------------------------------------
+set background=dark
+colorscheme hybrid
+
+" 行番号の色を変更
+highlight LineNr guifg=#666666
+highlight CursorLineNr guifg=#ffcc99
+
 " IME ON時のカーソルの色を設定(off:緑 on:紫)
+" ただしLinux環境では動作しない
 highlight Cursor guibg=Green guifg=NONE
 highlight CursorIM guibg=Red guifg=NONE
-
-" 半透明にする
-autocmd FocusGained * set transparency=220

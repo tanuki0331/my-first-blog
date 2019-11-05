@@ -9,6 +9,7 @@ set noundofile                                      " undoファイルを作成�
 set noswapfile                                      " swapファイルを作成しない
 set nobackup                                        " バックアップファイルを作成しない
 set wildmenu                                        " コマンドライン補完するときに強化されたものを使う
+set viminfo=                                        " viminfoファイルを作成しない
 
 "-------------------------------------------------------------------------------
 " 外観に関する設定
@@ -29,7 +30,7 @@ set showmatch                                       " 括弧入力時に対応�
 set ambiwidth=double                                " 全角記号のサイズを2byteにする
 set foldcolumn=3                                    " foldの表示領域
 set previewheight=20                                " previewの高さ
-set cursorline                                      " カーソルラインを表示
+set nocursorline                                    " カーソルラインは非表示(パフォーマンスのため)
 set scrolloff=6                                     " 縦スクロールの開始位置
 set sidescrolloff=16                                " 横スクロールの開始位置
 set splitbelow                                      " split時は下に作成
@@ -41,7 +42,6 @@ set whichwrap=b,s,h,l                               " 左右のカーソル移�
 "-------------------------------------------------------------------------------
 set hidden                                          " 編集中でもバッファを切り替える
 set backspace=indent,eol,start                      " バックスペースでインデントや改行を削除できるようにする
-set clipboard+=unnamed                              " ヤンクをクリップボードへ送り込む
 set expandtab                                       " タブをスペースに展開する
 " 改行時の自動コメントをオフ
 augroup auto_comment_off
@@ -49,6 +49,13 @@ augroup auto_comment_off
     autocmd BufEnter,FileType * setlocal formatoptions-=r
     autocmd BufEnter,FileType * setlocal formatoptions-=o
 augroup END
+
+" クリップボードの設定
+if has('win32') || has ('win64')
+    set clipboard+=unnamed
+else
+    set clipboard=unnamedplus
+endif
 
 "-------------------------------------------------------------------------------
 " 検索に関する設定
@@ -58,6 +65,11 @@ set smartcase                                       " 大文字小文字の両�
 set hlsearch                                        " 検索結果ハイライト
 set nowrapscan                                      " 検索時にファイルの最後まで行ったら最初に戻らない
 set incsearch                                       " インクリメントサーチ
+" 日本語対応grep
+if executable('jvgrep')
+    set grepprg=jvgrep
+    " autocmd QuickfixCmdPost grep,vimgrep if len(getqflist()) != 0 | cwindow | endif
+endif
 
 "-------------------------------------------------------------------------------
 " パフォーマンスに関する設定
@@ -153,8 +165,7 @@ endfunction
 nnoremap / :<c-u>set imsearch=0<CR>/
 
 " ファイルとバッファの内容でdiff
-set diffopt=filler,iwhite,internal
-command! DiffOrig tabnew % | vert new | set bt=nofile | r ++edit # | 0d_ | diffthis | wincmd p | diffthis
+command! DiffOrig tabnew # | vert new | set bt=nofile | r ++edit # | 0d_ | diffthis | wincmd p | diffthis
 nnoremap <silent> \dd :<C-u>DiffOrig<CR>
 
 " fold移動時にカーソルを中央に移動
@@ -216,8 +227,9 @@ function! Put_text_without_override_register()
     else
         execute 'normal! P'
     endif
+
 endfunction
-"
+
 " インデントを統一
 xnoremap = >gv<`j
 
@@ -243,17 +255,22 @@ cnoremap <C-e> <End>
 cnoremap <C-f> <Right>
 cnoremap <C-b> <Left>
 
+" 文字削除
+cnoremap <C-d> <DEL>
+
+" パスを表示
+cnoremap <C-z> <C-r>=expand('%:p')<CR>
+cnoremap <C-x> <C-r>=expand('%:p:h')<CR>
+
 " ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
 " プラグインの読込み
 " ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-
 " 以下のコマンドでインストールする
 " curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 " gvimで起動時にplug#beginが未定義となる場合は、以下が必要
 " cd /d %homepath%
 " mklink /j vimfiles .vim
 " Then reload .vimrc and :PlugInstall to install plugins.
-
 call plug#begin('~/.vim/plugged')
 Plug 'w0ng/vim-hybrid'
 Plug 'haya14busa/vim-asterisk'
@@ -272,8 +289,14 @@ Plug 'tpope/vim-fugitive'
 Plug 'Shougo/neocomplete.vim'
 Plug 'mattn/emmet-vim'
 Plug 'junegunn/vim-easy-align'
-Plug 'ronakg/quickr-preview.vim'
+Plug 'tpope/vim-surround'
 call plug#end()
+
+"-------------------------------------------------------------------------------
+"vim-hybridの設定
+"-------------------------------------------------------------------------------
+set background=dark
+colorscheme hybrid
 
 "-------------------------------------------------------------------------------
 "vim-asteriskの設定
@@ -298,7 +321,7 @@ noremap sF F
 "-------------------------------------------------------------------------------
 "vim-better-whitespaceの設定
 "-------------------------------------------------------------------------------
-let g:better_whitespace_guicolor='darkcyan'
+highlight ExtraWhitespace guibg=darkcyan
 
 "-------------------------------------------------------------------------------
 "tcomment_vimの設定
@@ -309,7 +332,13 @@ call tcomment#type#Define('crs', '/* %s */')
 "-------------------------------------------------------------------------------
 "vim-diffbufの設定
 "-------------------------------------------------------------------------------
-" mapping
+" diffの設定
+if v:version >= 801
+    " internalは8.1以降の新機能
+    set diffopt=internal,iwhite,filler
+else
+    set diffopt=iwhite,filler
+endif
 nnoremap <silent> \df :<C-u>DiffBuf<CR>
 
 "-------------------------------------------------------------------------------
@@ -354,27 +383,38 @@ let g:ctrlp_key_loop = 1
 
 " prompt時のマッピングの変更
 let g:ctrlp_prompt_mappings = {
-        \ 'PrtBS()':              ['<bs>', '<c-h>'],
-        \ 'PrtDelete()':          ['<del>', '<c-d>'],
-        \ 'PrtSelectMove("j")':   ['<c-n>', '<down>'],
-        \ 'PrtSelectMove("k")':   ['<c-p>', '<up>'],
-        \ 'PrtInsert("c")':       ['<c-v>', '<MiddleMouse>', '<insert>'],
-        \ 'AcceptSelection("v")': ['<RightMouse>'],
-        \ 'PrtHistory(-1)':       [],
-        \ 'PrtHistory(1)':        [],
-        \ 'ToggleByFname()':      [],
-        \ 'ToggleType(1)':        ['<c-up>'],
-        \ 'ToggleType(-1)':       ['<c-down>'],
-        \ 'PrtCurLeft()':         ['<left>', '<c-b>'],
-        \ 'PrtCurRight()':        ['<right>', '<c-f>'],
-        \ }
-
+            \ 'PrtBS()':              ['<bs>', '<c-h>'],
+            \ 'PrtDelete()':          ['<del>', '<c-d>'],
+            \ 'PrtSelectMove("j")':   ['<c-n>', '<down>'],
+            \ 'PrtSelectMove("k")':   ['<c-p>', '<up>'],
+            \ 'PrtInsert("c")':       ['<c-v>', '<MiddleMouse>', '<insert>'],
+            \ 'AcceptSelection("v")': ['<RightMouse>'],
+            \ 'PrtHistory(-1)':       [],
+            \ 'PrtHistory(1)':        [],
+            \ 'ToggleByFname()':      [],
+            \ 'ToggleType(1)':        ['<c-up>'],
+            \ 'ToggleType(-1)':       ['<c-down>'],
+            \ 'PrtCurLeft()':         ['<left>', '<c-b>'],
+            \ 'PrtCurRight()':        ['<right>', '<c-f>'],
+            \ }
 " マッピング
-nnoremap <silent> <space>b :<C-u>CtrlPBuffer<CR>
+nnoremap <silent> <space>b :<C-u>call <SID>uname_buf_delete() \| CtrlPBuffer<CR>
 nnoremap          <space>f :<C-u>CtrlP <C-R>=expand('%:p:h')<CR>
 nnoremap <silent> <space>m :<C-u>CtrlPMRU<CR>
 nnoremap <silent> <space>l :<C-u>CtrlPLine<CR>
 nnoremap <silent> <space>p :<C-u>CtrlPRoot<CR>
+
+" 未編集の無名バッファをすべて削除
+function! s:uname_buf_delete()
+    let l:last_buffer = bufnr('$')
+    let l:n = 1
+    while l:n <= last_buffer
+        if buflisted(l:n) && bufname(l:n) == '' && !getbufvar(l:n, '&modified') && l:n != bufnr('%')
+            silent exe 'bdel' . l:n
+        endif
+        let l:n = l:n+1
+    endwhile
+endfunction
 
 "-------------------------------------------------------------------------------
 "vim-singletonの設定
@@ -421,7 +461,10 @@ endfunction
 " Disable AutoComplPop.
 let g:acp_enableAtStartup = 0
 " Use neocomplete.
-let g:neocomplete#enable_at_startup = 1
+let g:neocomplete#enable_at_startup = 0
+if has('lua')
+  let g:neocomplete#enable_at_startup = 1
+endif
 " Use smartcase.
 let g:neocomplete#enable_smart_case = 1
 " Set minimum syntax keyword length.
@@ -463,15 +506,6 @@ inoremap <expr><BS> neocomplete#smart_close_popup()."\<C-h>"
 " Close popup by <Space>.
 "inoremap <expr><Space> pumvisible() ? "\<C-y>" : "\<Space>"
 
-" AutoComplPop like behavior.
-"let g:neocomplete#enable_auto_select = 1
-
-" Shell like behavior(not recommended).
-"set completeopt+=longest
-"let g:neocomplete#enable_auto_select = 1
-"let g:neocomplete#disable_auto_complete = 1
-"inoremap <expr><TAB>  pumvisible() ? "\<Down>" : "\<C-x>\<C-u>"
-
 " Enable omni completion.
 autocmd FileType css setlocal omnifunc=csscomplete#CompleteCSS
 autocmd FileType html,markdown setlocal omnifunc=htmlcomplete#CompleteTags
@@ -487,51 +521,7 @@ endif
 "let g:neocomplete#sources#omni#input_patterns.cpp = '[^.[:digit:] *\t]\%(\.\|->\)\|\h\w*::'
 
 "-------------------------------------------------------------------------------
-"mattn/emmet-vimの設定
-"-------------------------------------------------------------------------------
-let g:user_emmet_settings = {
-            \    'variables' : {
-            \        'lang' : 'ja',
-            \    },
-            \    'html' : {
-            \        'expandos' : {
-            \            'ol': 'ol>li',
-            \            'ul': 'ul>li',
-            \            'table': 'table>(thead>tr>th)+(tbody>tr>td)'
-            \        },
-            \        'snippets' : {
-            \            'js' : "<script src='${cursor}'></script>",
-            \            'css' : "<link rel='stylesheet' href='${cursor}'></link>",
-            \        },
-            \    },
-            \    'javascript' : {
-            \        'snippets' : {
-            \            'log' : "console.log(${cursor});",
-            \        },
-            \    },
-            \    'sql' : {
-            \        'snippets' : {
-            \            'sel' : "SELECT\nFROM\n\t${cursor}\nWHERE",
-            \            'upd' : "UPDATE\n\t${cursor}\nSET\nWHERE",
-            \            'del' : "DELETE\n\t${cursor}\nWHERE",
-            \            'to_d' : "TO_DATE('${cursor}', 'YYYY/MM/DD')",
-            \            'to_t' : "TO_DATE('${cursor}', 'YYYY/MM/DD HH24:MI:SS')",
-            \            'join' : "INNER JOIN ${cursor}",
-            \            'ljoin' : "LEFT OUTER JOIN ${cursor}",
-            \            'bw' : "TRUNC(SYSDATE) BETWEEN ${cursor}",
-            \        },
-            \    },
-            \}
-
-"-------------------------------------------------------------------------------
 "junegunn/vim-easy-alignの設定
 "-------------------------------------------------------------------------------
 vmap ga <Plug>(EasyAlign)
 
-"-------------------------------------------------------------------------------
-"ronakg/quickr-preview.vimの設定
-"-------------------------------------------------------------------------------
-let g:quickr_preview_keymaps = 0
-nnoremap ,w :<c-u>cwindow<CR>
-nmap ,p <plug>(quickr_preview)
-nmap <silent> ,q :<c-u>pclose<CR><plug>(quickr_preview_qf_close)
